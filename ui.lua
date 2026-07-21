@@ -1,9 +1,11 @@
 if not (ImGui) then
-    return warn("ImGui Library - your programm doesnt support imguii");
+    return warn("ImGui Library - your program doesn't support ImGui");
 end;
 
 local library = {
-    name = "Imgui lib";
+    name = "Imgui lib",
+    version = "v1.0",
+    build = "Release"
 };
 
 local internal = {
@@ -21,6 +23,7 @@ local insert, concat, clear = table.insert, table.concat, table.clear;
 local random, floor = math.random, math.floor;
 local char, find, split = string.char, string.find, string.split;
 
+-- Unique ID generator to prevent ImGui element ID collision
 local noise;
 do
     local noise_data = {};
@@ -32,7 +35,7 @@ do
 end;
 
 -- ==========================================================
--- VK KEY CODES
+-- VK KEY CODES & INPUT HANDLING
 -- ==========================================================
 local VK = {
     A = 0x41, B = 0x42, C = 0x43, D = 0x44, E = 0x45,
@@ -53,30 +56,40 @@ local VK = {
     Mouse1 = 0x01, Mouse2 = 0x02, Mouse3 = 0x04,
 };
 
-local function IsDown(code)
-    local success, result = pcall(function()
-        return is_key_down(code)
-    end)
-    return success and result
+-- Dual-compatible key down checker (string key name or VK hex code)
+local function IsDown(key_identifier)
+    if not key_identifier then return false end
+    
+    local success, result = pcall(is_key_down, key_identifier)
+    if success and result then return true end
+    
+    local code = VK[key_identifier] or (typeof(key_identifier) == "number" and key_identifier)
+    if code then
+        success, result = pcall(is_key_down, code)
+        if success and result then return true end
+    end
+    
+    return false
 end
 
 local function GetPressedKey()
-    for name, code in pairs(VK) do
-        if IsDown(code) then
+    for name, _ in pairs(VK) do
+        if IsDown(name) then
             return name
         end
     end
+    return nil
 end
 
 -- ==========================================================
--- THEME
+-- THEME SYSTEM
 -- ==========================================================
 local presets = {
-    Blue   = { accent = color3_new(0.20, 0.60, 1.00), hover = color3_new(0.30, 0.70, 1.00), active = color3_new(0.15, 0.50, 0.90) };
-    Purple = { accent = color3_new(0.70, 0.35, 1.00), hover = color3_new(0.78, 0.46, 1.00), active = color3_new(0.60, 0.28, 0.92) };
-    Green  = { accent = color3_new(0.20, 0.85, 0.45), hover = color3_new(0.30, 0.92, 0.55), active = color3_new(0.15, 0.72, 0.36) };
-    Red    = { accent = color3_new(1.00, 0.25, 0.25), hover = color3_new(1.00, 0.35, 0.35), active = color3_new(0.90, 0.15, 0.15) };
-    Orange = { accent = color3_new(1.00, 0.60, 0.15), hover = color3_new(1.00, 0.70, 0.25), active = color3_new(0.90, 0.50, 0.10) };
+    Blue   = { accent = color3_new(0.20, 0.60, 1.00), hover = color3_new(0.30, 0.70, 1.00), active = color3_new(0.15, 0.50, 0.90) },
+    Purple = { accent = color3_new(0.70, 0.35, 1.00), hover = color3_new(0.78, 0.46, 1.00), active = color3_new(0.60, 0.28, 0.92) },
+    Green  = { accent = color3_new(0.20, 0.85, 0.45), hover = color3_new(0.30, 0.92, 0.55), active = color3_new(0.15, 0.72, 0.36) },
+    Red    = { accent = color3_new(1.00, 0.25, 0.25), hover = color3_new(1.00, 0.35, 0.35), active = color3_new(0.90, 0.15, 0.15) },
+    Orange = { accent = color3_new(1.00, 0.60, 0.15), hover = color3_new(1.00, 0.70, 0.25), active = color3_new(0.90, 0.50, 0.10) },
 };
 
 local current_theme = "Blue";
@@ -95,13 +108,13 @@ function library.set_always_on_top(state)
     internal.always_on_top = state;
 end;
 
--- Colors
+-- Color Palette
 local bg = color3_new(0.06, 0.06, 0.08);
 local bg_secondary = color3_new(0.10, 0.10, 0.13);
 local bg_child = color3_new(0.08, 0.08, 0.10);
-local border_color = color3_new(0.15, 0.15, 0.20);
+local border_color = color3_new(0.16, 0.16, 0.22);
 local text_color = color3_new(0.92, 0.92, 0.95);
-local text_muted = color3_new(0.60, 0.60, 0.65);
+local text_muted = color3_new(0.55, 0.55, 0.60);
 
 local function push_theme()
     local t = presets[current_theme];
@@ -138,22 +151,39 @@ local function pop_accent_text()
     ImGui.PopStyleColor(1);
 end;
 
--- UI Functions
+-- Reference helper functions
+local function get_ref_val(ref)
+    if typeof(ref) == "table" then
+        return ref.Value ~= nil and ref.Value or ref[1]
+    end
+    return ref
+end
+
+local function set_ref_val(ref, new_val)
+    if typeof(ref) == "table" then
+        if ref.Value ~= nil then
+            ref.Value = new_val
+        else
+            ref[1] = new_val
+        end
+    end
+    return new_val
+end
+
+-- ==========================================================
+-- UI RENDER ENGINE (REDESIGNED FRONTEND)
+-- ==========================================================
 do
     function library.on_render()
-        if not isoverlayactive() then return end;
+        if isoverlayactive and not isoverlayactive() then return end;
         
-        -- Check UI keybind
-        local code = VK[internal.ui_keybind.Key];
-        if code and IsDown(code) then
-            internal.ui_keybind.Down = true;
-            -- Toggle UI visibility when key is pressed (just once)
+        -- Toggle keybind handling
+        if IsDown(internal.ui_keybind.Key) then
             if not internal.ui_keybind._pressed then
                 internal.ui_keybind._pressed = true;
                 internal.visible = not internal.visible;
             end
         else
-            internal.ui_keybind.Down = false;
             internal.ui_keybind._pressed = false;
         end
         
@@ -162,11 +192,10 @@ do
         push_theme();
         
         if not internal.sized then
-            ImGui.SetNextWindowSize(vector2_new(720, 480));
+            ImGui.SetNextWindowSize(vector2_new(740, 480));
             internal.sized = true;
         end;
         
-        -- Always on top flag
         local flags = ImGuiWindowFlags_NoTitleBar;
         if internal.always_on_top then
             flags = flags + ImGuiWindowFlags_NoMove;
@@ -175,105 +204,120 @@ do
         ImGui.Begin(library.name .. "###" .. noise, nil, flags);
         
         local window_size = ImGui.GetWindowSize();
+        local sidebar_width = 140;
+        local header_height = 28;
+        local footer_height = 24;
+        local content_height = window_size.Y - header_height - footer_height - 20;
         
-        -- Top Bar
+        -- ------------------------------------------------------
+        -- 1. TOP HEADER BAR
+        -- ------------------------------------------------------
         push_accent_text();
         ImGui.Text(library.name);
         pop_accent_text();
-        ImGui.SameLine();
-        ImGui.Text("|");
-        ImGui.SameLine();
-        
-        -- Always On Top toggle button
-        if internal.always_on_top then
-            ImGui.PushStyleColor(ImGuiCol_Button, presets[current_theme].accent);
-            ImGui.PushStyleColor(ImGuiCol_ButtonHovered, presets[current_theme].hover);
-            ImGui.PushStyleColor(ImGuiCol_ButtonActive, presets[current_theme].active);
-            ImGui.PushStyleColor(ImGuiCol_Text, color3_new(1, 1, 1));
-        end;
-        
-        if ImGui.Button("📌##pin" .. noise) then
-            internal.always_on_top = not internal.always_on_top;
-        end;
-        
-        if internal.always_on_top then
-            ImGui.PopStyleColor(4);
-        end;
         
         ImGui.SameLine();
+        ImGui.TextColored(ImGui.GetColorU32(0.55, 0.55, 0.60, 1), library.version or "v1.0");
         
-        -- Close button
+        -- Header Right Action Buttons
+        local close_btn_size = 20;
+        ImGui.SetCursorPos(vector2_new(window_size.X - close_btn_size - 10, 4));
         if ImGui.Button("✕##close" .. noise) then
             internal.visible = false;
         end;
         
-        ImGui.SameLine();
+        ImGui.SetCursorPos(vector2_new(window_size.X - (close_btn_size * 2) - 15, 4));
+        if internal.always_on_top then
+            ImGui.PushStyleColor(ImGuiCol_Button, presets[current_theme].accent);
+        end
+        if ImGui.Button("📌##pin" .. noise) then
+            internal.always_on_top = not internal.always_on_top;
+        end;
+        if internal.always_on_top then
+            ImGui.PopStyleColor(1);
+        end
         
-        -- Tabs
+        ImGui.SetCursorPos(vector2_new(0, header_height));
+        ImGui.Separator();
+        
+        -- ------------------------------------------------------
+        -- 2. LEFT SIDEBAR (VERTICAL NAVIGATION)
+        -- ------------------------------------------------------
+        ImGui.BeginChild("Sidebar##" .. noise, vector2_new(sidebar_width, content_height), ImGuiChildFlags_Border);
+        
+        ImGui.Indent(5);
+        ImGui.TextDisabled("NAVIGATION");
+        ImGui.Unindent(5);
+        ImGui.Separator();
+        
         for i, tab in ipairs(internal.tab_list) do
             local is_active = internal.tab == i;
+            local tab_label = (is_active and "● " or "○ ") .. tab.name;
             
             if is_active then
-                push_accent_text();
+                ImGui.PushStyleColor(ImGuiCol_Button, bg_secondary);
+                ImGui.PushStyleColor(ImGuiCol_Text, presets[current_theme].accent);
             end;
             
-            if ImGui.Button(tab.name .. "##" .. noise .. i) then
+            if ImGui.Button(tab_label .. "##sidebar_" .. noise .. i, vector2_new(sidebar_width - 16, 26)) then
                 internal.tab = i;
             end;
             
             if is_active then
-                pop_accent_text();
-            end;
-            
-            if i ~= #internal.tab_list then
-                ImGui.SameLine();
+                ImGui.PopStyleColor(2);
             end;
         end;
         
-        ImGui.Separator();
+        ImGui.EndChild();
+        ImGui.SameLine();
         
-        -- Content
+        -- ------------------------------------------------------
+        -- 3. MAIN CONTENT AREA (CARDS / GROUP BOXES)
+        -- ------------------------------------------------------
+        local main_width = window_size.X - sidebar_width - 25;
+        ImGui.BeginChild("MainArea##" .. noise, vector2_new(main_width, content_height), false);
+        
         local current_tab = internal.tab_list[internal.tab];
         if current_tab then
+            -- Active Tab Title Header
+            push_accent_text();
+            ImGui.Text(current_tab.name);
+            pop_accent_text();
+            ImGui.Separator();
+            
             local groups = current_tab.data;
-            local y_size = window_size.Y - 70;
-            local col_width = (window_size.X - 30) / 2;
             
-            -- Left Column
-            ImGui.BeginChild("Left##" .. noise, vector2_new(col_width, y_size), ImGuiChildFlags_Border);
-            for i = 1, #groups, 2 do
-                local group = groups[i];
-                if group then
-                    push_accent_text();
-                    ImGui.Text(group.name);
-                    pop_accent_text();
-                    ImGui.Separator();
-                    group.callback();
-                    if groups[i + 2] then
-                        ImGui.Separator();
-                    end;
-                end;
+            -- Render Groups as Clean Cards / Bordered Containers
+            for i, group in ipairs(groups) do
+                ImGui.BeginChild("GroupCard_" .. i .. "##" .. noise, vector2_new(main_width - 5, 0), ImGuiChildFlags_Border + ImGuiChildFlags_AutoResizeY);
+                
+                push_accent_text();
+                ImGui.Text(group.name);
+                pop_accent_text();
+                ImGui.Separator();
+                
+                group.callback();
+                
+                ImGui.EndChild();
+                ImGui.Separator();
             end;
-            ImGui.EndChild();
-            ImGui.SameLine();
-            
-            -- Right Column
-            ImGui.BeginChild("Right##" .. noise, vector2_new(col_width, y_size), ImGuiChildFlags_Border);
-            for i = 2, #groups, 2 do
-                local group = groups[i];
-                if group then
-                    push_accent_text();
-                    ImGui.Text(group.name);
-                    pop_accent_text();
-                    ImGui.Separator();
-                    group.callback();
-                    if groups[i + 2] then
-                        ImGui.Separator();
-                    end;
-                end;
-            end;
-            ImGui.EndChild();
         end;
+        
+        ImGui.EndChild();
+        
+        -- ------------------------------------------------------
+        -- 4. BOTTOM FOOTER / STATUS BAR
+        -- ------------------------------------------------------
+        ImGui.SetCursorPos(vector2_new(0, window_size.Y - footer_height));
+        ImGui.Separator();
+        
+        ImGui.Indent(10);
+        ImGui.TextDisabled("Theme: " .. current_theme);
+        ImGui.SameLine();
+        ImGui.TextDisabled("|  FPS: " .. tostring(floor(1 / (delta_time or 0.016))))
+        ImGui.SameLine();
+        ImGui.TextDisabled("|  Build: " .. (library.build or "Release"));
+        ImGui.Unindent(10);
         
         ImGui.End();
         pop_theme();
@@ -311,9 +355,19 @@ do
         return split(name, "##")[1];
     end;
     
-    -- Controls
+    -- ------------------------------------------------------
+    -- CONTROLS IMPLEMENTATION
+    -- ------------------------------------------------------
     function library.toggle(name, ref)
-        return ImGui.Checkbox(library.format_name(name), ref);
+        local current_state = get_ref_val(ref)
+        local changed, new_val = ImGui.Checkbox(library.format_name(name), current_state)
+        if changed ~= nil then
+            set_ref_val(ref, changed)
+            return changed
+        else
+            set_ref_val(ref, new_val)
+            return new_val
+        end
     end;
     
     function library.separator()
@@ -333,7 +387,11 @@ do
         if #label > 0 then
             ImGui.Text(label);
         end;
-        return ImGui.SliderInt("##" .. library.format_name(name), ref, min, max, format or "%i");
+        local current_val = get_ref_val(ref) or min
+        local res1, res2 = ImGui.SliderInt("##" .. library.format_name(name), current_val, min, max, format or "%i");
+        local new_val = res2 or res1
+        set_ref_val(ref, new_val)
+        return new_val
     end;
     
     function library.slider_float(name, min, max, ref, format)
@@ -341,7 +399,11 @@ do
         if #label > 0 then
             ImGui.Text(label);
         end;
-        return ImGui.SliderFloat("##" .. library.format_name(name), ref, min, max, format or "%.2f");
+        local current_val = get_ref_val(ref) or min
+        local res1, res2 = ImGui.SliderFloat("##" .. library.format_name(name), current_val, min, max, format or "%.2f");
+        local new_val = res2 or res1
+        set_ref_val(ref, new_val)
+        return new_val
     end;
     
     function library.slider_angle(name, min, max, ref, format)
@@ -349,7 +411,11 @@ do
         if #label > 0 then
             ImGui.Text(label);
         end;
-        return ImGui.SliderAngle("##" .. library.format_name(name), ref, min, max, format or "%.1f°");
+        local current_val = get_ref_val(ref) or min
+        local res1, res2 = ImGui.SliderAngle("##" .. library.format_name(name), current_val, min, max, format or "%.1f°");
+        local new_val = res2 or res1
+        set_ref_val(ref, new_val)
+        return new_val
     end;
     
     function library.keybind(name, ref)
@@ -359,27 +425,20 @@ do
             ImGui.SameLine();
         end;
         
-        -- Check if key is held down
-        local code = VK[ref.Key];
-        if code and IsDown(code) then
-            ref.Down = true;
-        else
-            ref.Down = false;
-        end;
+        ref.Down = IsDown(ref.Key);
         
-        -- Display current key or listening state
         if ref.Listening then
-            ImGui.TextColored(ImGui.GetColorU32(1, 1, 0, 1), "...");
-            ImGui.SameLine();
+            if ImGui.Button("[ Press Key... ]##" .. library.format_name(name)) then
+                ref.Listening = false;
+            end
             
-            -- Check for key press
-            local pressed = GetPressedKey();
-            if pressed then
-                ref.Key = pressed;
+            local key_pressed = GetPressedKey();
+            if key_pressed then
+                ref.Key = key_pressed;
                 ref.Listening = false;
             end;
         else
-            if ImGui.Button(ref.Key .. "##" .. library.format_name(name)) then
+            if ImGui.Button((ref.Key or "None") .. "##" .. library.format_name(name)) then
                 ref.Listening = true;
             end;
         end;
@@ -389,7 +448,7 @@ do
     
     function library.dropdown(name, options)
         local label = library.split_name(name);
-        ImGui.Text(label);
+        if #label > 0 then ImGui.Text(label); end
         
         local selected = {};
         for i, opt in ipairs(options) do
@@ -415,7 +474,7 @@ do
     function library.multi_dropdown(name, options, min)
         min = min or 0;
         local label = library.split_name(name);
-        ImGui.Text(label);
+        if #label > 0 then ImGui.Text(label); end
         
         local selected = {};
         for i, opt in ipairs(options) do
@@ -429,7 +488,7 @@ do
                 local clicked = ImGui.Selectable(opt[1], opt[2]);
                 if clicked then
                     if opt[2] and #selected <= min then
-                        -- Keep at least min selected
+                        -- Keep min options selected
                     else
                         opt[2] = not opt[2];
                     end;
@@ -442,16 +501,20 @@ do
     
     function library.color_picker3(name, ref)
         local label = library.split_name(name);
-        ImGui.Text(label);
-        ImGui.SameLine();
+        if #label > 0 then
+            ImGui.Text(label);
+            ImGui.SameLine();
+        end;
         
-        if ImGui.ColorButton("##" .. library.format_name(name), ref.color, ImGuiColorEditFlags_NoTooltip, vector2_new(30, 20)) then
+        ref.color = ref.color or color3_new(1, 1, 1);
+        
+        if ImGui.ColorButton("##btn_" .. library.format_name(name), ref.color, ImGuiColorEditFlags_NoTooltip, vector2_new(30, 20)) then
             ref.visible = not ref.visible;
         end;
         
         if ref.visible then
             ImGui.SetNextWindowPos(ImGui.GetWindowPos() + ImGui.GetCursorPos(), ImGuiCond_Appearing);
-            local open = ImGui.Begin(label .. "###" .. library.format_name(name), nil, 
+            local open = ImGui.Begin(label .. "###win_" .. library.format_name(name), nil, 
                 ImGuiWindowFlags_NoResize + ImGuiWindowFlags_AlwaysAutoResize + ImGuiWindowFlags_NoCollapse);
             if open then
                 ref.color = ImGui.ColorPicker3("##picker" .. noise, ref.color, ImGuiColorEditFlags_NoLabel);
