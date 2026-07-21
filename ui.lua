@@ -49,8 +49,11 @@ do
             return;
         end;
 
-        ImGui.SetNextWindowSize(vector2_new(680, 420));
-        ImGui.Begin(library.name .. "###" .. noise, nil, ImGuiWindowFlags_NoTitleBar + ImGuiWindowFlags_NoResize + ImGuiWindowFlags_NoScrollbar --[[+ 0x2000000]]); -- ImGuiWindowFlags_NoDocking
+        if not internal.sized then
+            ImGui.SetNextWindowSize(vector2_new(680, 420));
+            internal.sized = true;
+        end;
+        ImGui.Begin(library.name .. "###" .. noise, nil, ImGuiWindowFlags_NoTitleBar --[[+ 0x2000000]]); -- ImGuiWindowFlags_NoDocking
 
         local tab_list = internal.tab_list;
         local window_size = ImGui.GetWindowSize();
@@ -79,7 +82,6 @@ do
 
                 if ImGui.Button(tab.name) then
                     internal.tab = i;
-                    internal.group = 1;
                 end;
 
                 if i ~= amount then
@@ -90,35 +92,44 @@ do
 
         ImGui.Separator();
 
-        local y_size = window_size.Y - 70;
         local tab = tab_list[internal.tab];
+        local y_size = window_size.Y - 70;
+        local col_width = (window_size.X - 30) / 2;
 
-        if (ImGui.BeginChild("Groups##" .. noise, vector2_new(180, y_size), ImGuiChildFlags_Border)) then
-            ImGui.Text("CATEGORIES");
-            ImGui.Separator();
+        -- render every group in the current tab at once, side by side
+        -- in two columns, instead of a categories list that shows one
+        -- group at a time
+        if tab then
+            local groups = tab.data;
 
-            local group = internal.group;
-
-            for i = 1, #tab.data do
-                local drawn, clicked = ImGui.Selectable(tab.data[i].name, group == i);
-                if clicked then
-                    internal.group = i;
+            if (ImGui.BeginChild("ColLeft##" .. noise, vector2_new(col_width, y_size), ImGuiChildFlags_Border)) then
+                for i = 1, #groups, 2 do
+                    local group = groups[i];
+                    ImGui.ColorButton("##groupmark" .. i .. noise, accent_color, ImGuiColorEditFlags_NoTooltip, vector2_new(10, 10));
+                    ImGui.SameLine();
+                    ImGui.Text(group.name);
+                    ImGui.Separator();
+                    group.callback();
+                    if groups[i + 2] then
+                        ImGui.Separator();
+                    end;
                 end;
-            end;
-        end; ImGui.EndChild(); ImGui.SameLine();
+            end; ImGui.EndChild(); ImGui.SameLine();
 
-        if (ImGui.BeginChild("Data##" .. noise, vector2_new(window_size.X - 202, y_size), ImGuiChildFlags_Border)) then
-            local group = tab.data[internal.group];
-            if group then
-                ImGui.ColorButton("##groupmark" .. noise, accent_color, ImGuiColorEditFlags_NoTooltip, vector2_new(10, 10));
-                ImGui.SameLine();
-                ImGui.Text(group.name);
-                ImGui.Separator();
-                ImGui.Text(" ");
-
-                group.callback();
-            end;
-        end; ImGui.EndChild();
+            if (ImGui.BeginChild("ColRight##" .. noise, vector2_new(col_width, y_size), ImGuiChildFlags_Border)) then
+                for i = 2, #groups, 2 do
+                    local group = groups[i];
+                    ImGui.ColorButton("##groupmark" .. i .. noise, accent_color, ImGuiColorEditFlags_NoTooltip, vector2_new(10, 10));
+                    ImGui.SameLine();
+                    ImGui.Text(group.name);
+                    ImGui.Separator();
+                    group.callback();
+                    if groups[i + 2] then
+                        ImGui.Separator();
+                    end;
+                end;
+            end; ImGui.EndChild();
+        end;
 
         ImGui.End();
     end;
