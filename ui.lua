@@ -12,6 +12,7 @@ local internal = {
     sized = false;
     always_on_top = false;
     visible = true;
+    ui_keybind = { Key = "F1", Listening = false, Down = false };
 };
 
 local vector2_new = Vector2.new;
@@ -31,7 +32,7 @@ do
 end;
 
 -- ==========================================================
--- KEYBIND SYSTEM
+-- VK KEY CODES
 -- ==========================================================
 local VK = {
     A = 0x41, B = 0x42, C = 0x43, D = 0x44, E = 0x45,
@@ -141,6 +142,21 @@ end;
 do
     function library.on_render()
         if not isoverlayactive() then return end;
+        
+        -- Check UI keybind
+        local code = VK[internal.ui_keybind.Key];
+        if code and IsDown(code) then
+            internal.ui_keybind.Down = true;
+            -- Toggle UI visibility when key is pressed (just once)
+            if not internal.ui_keybind._pressed then
+                internal.ui_keybind._pressed = true;
+                internal.visible = not internal.visible;
+            end
+        else
+            internal.ui_keybind.Down = false;
+            internal.ui_keybind._pressed = false;
+        end
+        
         if not internal.visible then return end;
         
         push_theme();
@@ -150,7 +166,13 @@ do
             internal.sized = true;
         end;
         
-        ImGui.Begin(library.name .. "###" .. noise, nil, ImGuiWindowFlags_NoTitleBar);
+        -- Always on top flag
+        local flags = ImGuiWindowFlags_NoTitleBar;
+        if internal.always_on_top then
+            flags = flags + ImGuiWindowFlags_NoMove;
+        end;
+        
+        ImGui.Begin(library.name .. "###" .. noise, nil, flags);
         
         local window_size = ImGui.GetWindowSize();
         
@@ -180,7 +202,7 @@ do
         
         ImGui.SameLine();
         
-        -- Close button (F1)
+        -- Close button
         if ImGui.Button("✕##close" .. noise) then
             internal.visible = false;
         end;
