@@ -31,58 +31,16 @@ end;
 
 -- ==========================================================
 -- THEME
--- These are just plain colour values fed into the existing
--- ImGui.PushStyleColor / PushStyleVar calls (standard Dear
--- ImGui API, no custom/made-up functions).
+-- Your executor's ImGui binding doesn't expose PushStyleColor /
+-- PushStyleVar (they weren't in the original script, and calling
+-- them errors), so no actual style-injection API is used here.
+-- The "modern" look comes only from layout/structure using the
+-- same functions the original script already called
+-- (Begin, Button, Text, Selectable, ColorButton, BeginChild...).
+-- accent_color is only ever passed into ImGui.ColorButton, which
+-- was already used in the original script.
 -- ==========================================================
-local theme = {
-    bg            = color3_new(0.07, 0.07, 0.09),
-    bg_secondary  = color3_new(0.10, 0.10, 0.13),
-    bg_child      = color3_new(0.09, 0.09, 0.115),
-    border        = color3_new(0.18, 0.18, 0.22),
-    accent        = color3_new(0.35, 0.55, 1.00),
-    accent_hover  = color3_new(0.45, 0.63, 1.00),
-    accent_active = color3_new(0.28, 0.46, 0.92),
-    text          = color3_new(0.90, 0.90, 0.94),
-    text_dim      = color3_new(0.55, 0.55, 0.62),
-    selectable    = color3_new(0.16, 0.16, 0.20),
-};
-
-local function push_theme()
-    ImGui.PushStyleColor(ImGuiCol_WindowBg, theme.bg);
-    ImGui.PushStyleColor(ImGuiCol_ChildBg, theme.bg_child);
-    ImGui.PushStyleColor(ImGuiCol_Border, theme.border);
-    ImGui.PushStyleColor(ImGuiCol_Text, theme.text);
-
-    ImGui.PushStyleColor(ImGuiCol_Button, theme.bg_secondary);
-    ImGui.PushStyleColor(ImGuiCol_ButtonHovered, theme.accent_hover);
-    ImGui.PushStyleColor(ImGuiCol_ButtonActive, theme.accent_active);
-
-    ImGui.PushStyleColor(ImGuiCol_FrameBg, theme.bg_secondary);
-    ImGui.PushStyleColor(ImGuiCol_FrameBgHovered, theme.bg_secondary);
-    ImGui.PushStyleColor(ImGuiCol_FrameBgActive, theme.bg_secondary);
-
-    ImGui.PushStyleColor(ImGuiCol_Header, theme.accent_active);
-    ImGui.PushStyleColor(ImGuiCol_HeaderHovered, theme.accent_hover);
-    ImGui.PushStyleColor(ImGuiCol_HeaderActive, theme.accent);
-
-    ImGui.PushStyleColor(ImGuiCol_SliderGrab, theme.accent);
-    ImGui.PushStyleColor(ImGuiCol_SliderGrabActive, theme.accent_hover);
-    ImGui.PushStyleColor(ImGuiCol_CheckMark, theme.accent);
-    ImGui.PushStyleColor(ImGuiCol_Separator, theme.border);
-
-    ImGui.PushStyleVar(ImGuiStyleVar_WindowRounding, 8);
-    ImGui.PushStyleVar(ImGuiStyleVar_ChildRounding, 6);
-    ImGui.PushStyleVar(ImGuiStyleVar_FrameRounding, 4);
-    ImGui.PushStyleVar(ImGuiStyleVar_GrabRounding, 4);
-    ImGui.PushStyleVar(ImGuiStyleVar_ItemSpacing, vector2_new(8, 6));
-    ImGui.PushStyleVar(ImGuiStyleVar_WindowPadding, vector2_new(12, 12));
-end;
-
-local function pop_theme()
-    ImGui.PopStyleVar(6);
-    ImGui.PopStyleColor(17);
-end;
+local accent_color = color3_new(0.35, 0.55, 1.00);
 
 do
 
@@ -91,24 +49,20 @@ do
             return;
         end;
 
-        push_theme();
-
         ImGui.SetNextWindowSize(vector2_new(680, 420));
         ImGui.Begin(library.name .. "###" .. noise, nil, ImGuiWindowFlags_NoTitleBar + ImGuiWindowFlags_NoResize + ImGuiWindowFlags_NoScrollbar --[[+ 0x2000000]]); -- ImGuiWindowFlags_NoDocking
 
         local tab_list = internal.tab_list;
         local window_size = ImGui.GetWindowSize();
 
-        -- top bar: brand on the left, tab buttons centered/left after it
+        -- top bar: small accent square as a "brand mark", then the
+        -- brand name, then the tab buttons on the same line
         do
-            ImGui.PushStyleColor(ImGuiCol_Text, theme.accent);
-            ImGui.Text(library.name);
-            ImGui.PopStyleColor(1);
-
+            ImGui.ColorButton("##brand" .. noise, accent_color, ImGuiColorEditFlags_NoTooltip, vector2_new(14, 14));
             ImGui.SameLine();
-            ImGui.PushStyleColor(ImGuiCol_Text, theme.text_dim);
+            ImGui.Text(library.name);
+            ImGui.SameLine();
             ImGui.Text("|");
-            ImGui.PopStyleColor(1);
             ImGui.SameLine();
 
             local amount = #tab_list;
@@ -116,18 +70,16 @@ do
                 local tab = tab_list[i];
                 local is_active = (internal.tab == i);
 
+                -- mark the active tab without style-pushing: a small
+                -- accent-colored dot in front of its label
                 if is_active then
-                    ImGui.PushStyleColor(ImGuiCol_Button, theme.accent);
-                    ImGui.PushStyleColor(ImGuiCol_ButtonHovered, theme.accent_hover);
+                    ImGui.ColorButton("##active" .. i .. noise, accent_color, ImGuiColorEditFlags_NoTooltip, vector2_new(8, 8));
+                    ImGui.SameLine();
                 end;
 
                 if ImGui.Button(tab.name) then
                     internal.tab = i;
                     internal.group = 1;
-                end;
-
-                if is_active then
-                    ImGui.PopStyleColor(2);
                 end;
 
                 if i ~= amount then
@@ -142,9 +94,7 @@ do
         local tab = tab_list[internal.tab];
 
         if (ImGui.BeginChild("Groups##" .. noise, vector2_new(180, y_size), ImGuiChildFlags_Border)) then
-            ImGui.PushStyleColor(ImGuiCol_Text, theme.text_dim);
             ImGui.Text("CATEGORIES");
-            ImGui.PopStyleColor(1);
             ImGui.Separator();
 
             local group = internal.group;
@@ -160,9 +110,9 @@ do
         if (ImGui.BeginChild("Data##" .. noise, vector2_new(window_size.X - 202, y_size), ImGuiChildFlags_Border)) then
             local group = tab.data[internal.group];
             if group then
-                ImGui.PushStyleColor(ImGuiCol_Text, theme.accent);
+                ImGui.ColorButton("##groupmark" .. noise, accent_color, ImGuiColorEditFlags_NoTooltip, vector2_new(10, 10));
+                ImGui.SameLine();
                 ImGui.Text(group.name);
-                ImGui.PopStyleColor(1);
                 ImGui.Separator();
                 ImGui.Text(" ");
 
@@ -171,8 +121,6 @@ do
         end; ImGui.EndChild();
 
         ImGui.End();
-
-        pop_theme();
     end;
 
     function library.add_tab(name)
