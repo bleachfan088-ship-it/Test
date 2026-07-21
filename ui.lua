@@ -109,14 +109,6 @@ end;
 local UserInputService = game:GetService("UserInputService");
 local VirtualInputManager = game:GetService("VirtualInputManager");
 
-local function keypress(key)
-    VirtualInputManager:SendKeyEvent(true, key, false, game);
-end;
-
-local function keyrelease(key)
-    VirtualInputManager:SendKeyEvent(false, key, false, game);
-end;
-
 -- F1 Toggle
 UserInputService.InputBegan:Connect(function(input, game_processed)
     if game_processed then return end;
@@ -157,17 +149,11 @@ do
             internal.sized = true;
         end;
         
-        -- Set always on top flag
-        local flags = ImGuiWindowFlags_NoTitleBar;
-        if internal.always_on_top then
-            flags = flags + 0x00000020; -- ImGuiWindowFlags_NoMove
-        end;
-        
-        ImGui.Begin(library.name .. "###" .. noise, nil, flags);
+        ImGui.Begin(library.name .. "###" .. noise, nil, ImGuiWindowFlags_NoTitleBar);
         
         local window_size = ImGui.GetWindowSize();
         
-        -- Top Bar with Always On Top toggle
+        -- Top Bar
         push_accent_text();
         ImGui.Text(library.name);
         pop_accent_text();
@@ -231,18 +217,17 @@ do
             local col_width = (window_size.X - 30) / 2;
             
             -- Left Column
-            if ImGui.BeginChild("Left##" .. noise, vector2_new(col_width, y_size), ImGuiChildFlags_Border) then
-                for i = 1, #groups, 2 do
-                    local group = groups[i];
-                    if group then
-                        push_accent_text();
-                        ImGui.Text(group.name);
-                        pop_accent_text();
+            ImGui.BeginChild("Left##" .. noise, vector2_new(col_width, y_size), ImGuiChildFlags_Border);
+            for i = 1, #groups, 2 do
+                local group = groups[i];
+                if group then
+                    push_accent_text();
+                    ImGui.Text(group.name);
+                    pop_accent_text();
+                    ImGui.Separator();
+                    group.callback();
+                    if groups[i + 2] then
                         ImGui.Separator();
-                        group.callback();
-                        if groups[i + 2] then
-                            ImGui.Separator();
-                        end;
                     end;
                 end;
             end;
@@ -250,18 +235,17 @@ do
             ImGui.SameLine();
             
             -- Right Column
-            if ImGui.BeginChild("Right##" .. noise, vector2_new(col_width, y_size), ImGuiChildFlags_Border) then
-                for i = 2, #groups, 2 do
-                    local group = groups[i];
-                    if group then
-                        push_accent_text();
-                        ImGui.Text(group.name);
-                        pop_accent_text();
+            ImGui.BeginChild("Right##" .. noise, vector2_new(col_width, y_size), ImGuiChildFlags_Border);
+            for i = 2, #groups, 2 do
+                local group = groups[i];
+                if group then
+                    push_accent_text();
+                    ImGui.Text(group.name);
+                    pop_accent_text();
+                    ImGui.Separator();
+                    group.callback();
+                    if groups[i + 2] then
                         ImGui.Separator();
-                        group.callback();
-                        if groups[i + 2] then
-                            ImGui.Separator();
-                        end;
                     end;
                 end;
             end;
@@ -342,7 +326,7 @@ do
         if #label > 0 then
             ImGui.Text(label);
         end;
-        return ImGui.SliderFloat("##" .. library.format_name(name), ref, min, max, format or "%.1f°");
+        return ImGui.SliderAngle("##" .. library.format_name(name), ref, min, max, format or "%.1f°");
     end;
     
     function library.keybind(name, ref)
