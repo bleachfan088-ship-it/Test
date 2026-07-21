@@ -7,6 +7,7 @@ print("[ESP] Loading ImGui ESP with integrated controls...")
 local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/bouibot/ImGui-Library/refs/heads/main/Library.luau"))();
 local rage = library.add_tab("Rage");
 local visuals = library.add_tab("Visuals");
+local options = library.add_tab("Options");
 
 -- ============================================
 -- SETTINGS
@@ -43,7 +44,11 @@ local CONFIG = {
     HEALTHBAR_OUTLINE_COLOR = Color3.fromRGB(0, 0, 0),
     HEALTHBAR_POSITION = 0,
 
-    MAX_DISTANCE = 1000
+    -- OPTIONS
+    TEAM_CHECK = false,
+    VISIBILITY_CHECK = false,
+    MAX_DISTANCE = 1000,
+    SHOW_TEAMMATES = false
 }
 
 -- UI STATE
@@ -78,6 +83,7 @@ local distance_outline_options = {
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -539,6 +545,69 @@ end
 
 
 -- ============================================
+-- VISIBILITY CHECK
+-- ============================================
+
+local function isPlayerVisible(character)
+    if not character then return false end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
+    
+    local localCharacter = LocalPlayer.Character
+    if not localCharacter then return false end
+    
+    local localRoot = localCharacter:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return false end
+    
+    -- Cast a ray from the local player's eyes to the target player
+    local origin = localRoot.Position + Vector3.new(0, 1.5, 0)
+    local target = rootPart.Position + Vector3.new(0, 1.5, 0)
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {localCharacter, character}
+    raycastParams.IgnoreWater = true
+    
+    local result = Workspace:Raycast(origin, (target - origin), raycastParams)
+    
+    -- If no result, the player is visible
+    return result == nil
+end
+
+-- ============================================
+-- TEAM CHECK
+-- ============================================
+
+local function isSameTeam(player)
+    if not player then return false end
+    
+    -- Check if player has a TeamColor on their Humanoid
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid:FindFirstChild("TeamColor") then
+            local localCharacter = LocalPlayer.Character
+            if localCharacter then
+                local localHumanoid = localCharacter:FindFirstChildOfClass("Humanoid")
+                if localHumanoid and localHumanoid:FindFirstChild("TeamColor") then
+                    return humanoid.TeamColor == localHumanoid.TeamColor
+                end
+            end
+        end
+    end
+    
+    -- Fallback: Check if they're on the same team using team property
+    if player.Team and LocalPlayer.Team then
+        return player.Team == LocalPlayer.Team
+    end
+    
+    return false
+end
+
+
+
+-- ============================================
 -- TEXT RENDERING WITH OUTLINE TYPES
 -- ============================================
 
@@ -630,6 +699,24 @@ local function updatePlayer(player)
     if distance > CONFIG.MAX_DISTANCE then
         cleanupESP(data)
         return
+    end
+
+    -- Team check
+    if CONFIG.TEAM_CHECK then
+        if isSameTeam(player) then
+            if not CONFIG.SHOW_TEAMMATES then
+                cleanupESP(data)
+                return
+            end
+        end
+    end
+
+    -- Visibility check
+    if CONFIG.VISIBILITY_CHECK then
+        if not isPlayerVisible(character) then
+            cleanupESP(data)
+            return
+        end
     end
 
     -- Get padding value for syncing positions
@@ -907,6 +994,19 @@ library.add_group(visuals, "Healthbar ESP", function()
     CONFIG.HEALTHBAR_OUTLINE_COLOR = ui_state.health_outline_color.color
 
     CONFIG.HEALTHBAR_POSITION = library.slider_int("Bar Position##slider", -10, 10, CONFIG.HEALTHBAR_POSITION, "%ipx")
+end)
+
+
+-- ============================================
+-- IMGUI CONTROLS - OPTIONS TAB
+-- ============================================
+
+library.add_group(options, "ESP Options", function()
+    CONFIG.TEAM_CHECK = library.toggle("Team Check##team_check", CONFIG.TEAM_CHECK)
+    CONFIG.SHOW_TEAMMATES = library.toggle("Show Teammates##show_teammates", CONFIG.SHOW_TEAMMATES)
+    CONFIG.VISIBILITY_CHECK = library.toggle("Visibility Check##vis_check", CONFIG.VISIBILITY_CHECK)
+    CONFIG.MAX_DISTANCE = library.slider_int("Max Distance##max_dist", 100, 2000, CONFIG.MAX_DISTANCE, "%im")
+    library.text("Note: Visibility check may impact performance")
 end)
 
 
