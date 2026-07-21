@@ -1,5 +1,5 @@
 if not (ImGui) then
-    return warn("ImGui Library - your executor doesn't support ImGui");
+    return warn("ImGui Library - your programm doesnt support imguii");
 end;
 
 local library = {
