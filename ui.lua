@@ -31,7 +31,6 @@ end;
 
 -- ==========================================================
 -- THEME - Dark Modern UI
--- Inspired by the reference image with a dark, sleek aesthetic
 -- ==========================================================
 local presets = {
     Blue   = { 
@@ -81,65 +80,38 @@ local bg_child      = color3_new(0.08, 0.08, 0.10);
 local border_color  = color3_new(0.15, 0.15, 0.20);
 local text_color    = color3_new(0.92, 0.92, 0.95);
 local text_muted    = color3_new(0.60, 0.60, 0.65);
-local pushed_colors = 0;
 
 local function push_theme()
     local t = presets[current_theme];
-    local n = 0;
-
-    local function push(col, value)
-        ImGui.PushStyleColor(col, value);
-        n += 1;
-    end;
-
-    -- Base colors
-    push(ImGuiCol_WindowBg, bg);
-    push(ImGuiCol_ChildBg, bg_child);
-    push(ImGuiCol_Border, border_color);
-    push(ImGuiCol_Text, text_color);
-    push(ImGuiCol_TextDisabled, text_muted);
-
-    -- Buttons
-    push(ImGuiCol_Button, bg_secondary);
-    push(ImGuiCol_ButtonHovered, t.hover);
-    push(ImGuiCol_ButtonActive, t.active);
-
-    -- Frames
-    push(ImGuiCol_FrameBg, bg_secondary);
-    push(ImGuiCol_FrameBgHovered, bg_secondary);
-    push(ImGuiCol_FrameBgActive, bg_secondary);
-
-    -- Headers
-    push(ImGuiCol_Header, t.active);
-    push(ImGuiCol_HeaderHovered, t.hover);
-    push(ImGuiCol_HeaderActive, t.accent);
-
-    -- Sliders & Checks
-    push(ImGuiCol_SliderGrab, t.accent);
-    push(ImGuiCol_SliderGrabActive, t.hover);
-    push(ImGuiCol_CheckMark, t.accent);
-
-    -- Separators
-    push(ImGuiCol_Separator, border_color);
-    push(ImGuiCol_SeparatorHovered, t.accent2);
-    push(ImGuiCol_SeparatorActive, t.accent);
-
-    -- Scrollbar
-    push(ImGuiCol_ScrollbarBg, bg_secondary);
-    push(ImGuiCol_ScrollbarGrab, t.accent2);
-    push(ImGuiCol_ScrollbarGrabHovered, t.hover);
-    push(ImGuiCol_ScrollbarGrabActive, t.accent);
-
-    pushed_colors = n;
+    
+    ImGui.PushStyleColor(ImGuiCol_WindowBg, bg);
+    ImGui.PushStyleColor(ImGuiCol_ChildBg, bg_child);
+    ImGui.PushStyleColor(ImGuiCol_Border, border_color);
+    ImGui.PushStyleColor(ImGuiCol_Text, text_color);
+    ImGui.PushStyleColor(ImGuiCol_TextDisabled, text_muted);
+    ImGui.PushStyleColor(ImGuiCol_Button, bg_secondary);
+    ImGui.PushStyleColor(ImGuiCol_ButtonHovered, t.hover);
+    ImGui.PushStyleColor(ImGuiCol_ButtonActive, t.active);
+    ImGui.PushStyleColor(ImGuiCol_FrameBg, bg_secondary);
+    ImGui.PushStyleColor(ImGuiCol_FrameBgHovered, bg_secondary);
+    ImGui.PushStyleColor(ImGuiCol_FrameBgActive, bg_secondary);
+    ImGui.PushStyleColor(ImGuiCol_Header, t.active);
+    ImGui.PushStyleColor(ImGuiCol_HeaderHovered, t.hover);
+    ImGui.PushStyleColor(ImGuiCol_HeaderActive, t.accent);
+    ImGui.PushStyleColor(ImGuiCol_SliderGrab, t.accent);
+    ImGui.PushStyleColor(ImGuiCol_SliderGrabActive, t.hover);
+    ImGui.PushStyleColor(ImGuiCol_CheckMark, t.accent);
+    ImGui.PushStyleColor(ImGuiCol_Separator, border_color);
 end;
 
 local function pop_theme()
-    ImGui.PopStyleColor(pushed_colors);
+    ImGui.PopStyleColor(18);
 end;
 
 local function push_accent_text()
     ImGui.PushStyleColor(ImGuiCol_Text, presets[current_theme].accent);
 end;
+
 local function pop_accent_text()
     ImGui.PopStyleColor(1);
 end;
@@ -147,6 +119,7 @@ end;
 local function push_muted_text()
     ImGui.PushStyleColor(ImGuiCol_Text, text_muted);
 end;
+
 local function pop_muted_text()
     ImGui.PopStyleColor(1);
 end;
@@ -164,24 +137,13 @@ do
             internal.sized = true;
         end;
         
-        -- Window styling
-        ImGui.PushStyleVar(ImGuiStyleVar_WindowRounding, 8);
-        ImGui.PushStyleVar(ImGuiStyleVar_WindowPadding, vector2_new(10, 10));
-        ImGui.PushStyleVar(ImGuiStyleVar_ItemSpacing, vector2_new(8, 6));
-        ImGui.PushStyleVar(ImGuiStyleVar_FrameRounding, 4);
-        ImGui.PushStyleVar(ImGuiStyleVar_ChildRounding, 4);
-        
-        ImGui.Begin(library.name .. "###" .. noise, nil, ImGuiWindowFlags_NoTitleBar + ImGuiWindowFlags_NoResize);
-        
-        ImGui.PopStyleVar(5);
+        ImGui.Begin(library.name .. "###" .. noise, nil, ImGuiWindowFlags_NoTitleBar);
 
         local tab_list = internal.tab_list;
         local window_size = ImGui.GetWindowSize();
 
         -- Top bar
         do
-            ImGui.PushStyleVar(ImGuiStyleVar_ItemSpacing, vector2_new(12, 6));
-            
             -- Title
             push_accent_text();
             ImGui.Text(library.name);
@@ -205,11 +167,9 @@ do
                     push_muted_text();
                 end;
 
-                ImGui.PushStyleVar(ImGuiStyleVar_ButtonTextAlign, vector2_new(0.5, 0.5));
-                if ImGui.Button(tab.name .. "##" .. noise .. i, vector2_new(0, 28)) then
+                if ImGui.Button(tab.name .. "##" .. noise .. i) then
                     internal.tab = i;
                 end;
-                ImGui.PopStyleVar();
 
                 if is_active then
                     pop_accent_text();
@@ -221,15 +181,13 @@ do
                     ImGui.SameLine();
                 end;
             end;
-            
-            ImGui.PopStyleVar();
         end;
 
         ImGui.Separator();
 
         local tab = tab_list[internal.tab];
-        local y_size = window_size.Y - 75;
-        local col_width = (window_size.X - 35) / 2;
+        local y_size = window_size.Y - 70;
+        local col_width = (window_size.X - 30) / 2;
 
         if tab then
             local groups = tab.data;
@@ -238,21 +196,12 @@ do
                 for i = 1, #groups, 2 do
                     local group = groups[i];
                     
-                    -- Group header
                     push_accent_text();
                     ImGui.Text(group.name);
                     pop_accent_text();
                     
-                    ImGui.PushStyleColor(ImGuiCol_Separator, presets[current_theme].accent2);
                     ImGui.Separator();
-                    ImGui.PopStyleColor();
-                    
-                    ImGui.PushStyleVar(ImGuiStyleVar_ItemSpacing, vector2_new(8, 8));
-                    ImGui.PushStyleVar(ImGuiStyleVar_FramePadding, vector2_new(6, 4));
-                    
                     group.callback();
-                    
-                    ImGui.PopStyleVar(2);
                     
                     if groups[i + 2] then
                         ImGui.Separator();
@@ -268,16 +217,8 @@ do
                     ImGui.Text(group.name);
                     pop_accent_text();
                     
-                    ImGui.PushStyleColor(ImGuiCol_Separator, presets[current_theme].accent2);
                     ImGui.Separator();
-                    ImGui.PopStyleColor();
-                    
-                    ImGui.PushStyleVar(ImGuiStyleVar_ItemSpacing, vector2_new(8, 8));
-                    ImGui.PushStyleVar(ImGuiStyleVar_FramePadding, vector2_new(6, 4));
-                    
                     group.callback();
-                    
-                    ImGui.PopStyleVar(2);
                     
                     if groups[i + 2] then
                         ImGui.Separator();
@@ -473,12 +414,10 @@ do
             label = "None";
         end;
 
-        ImGui.PushStyleVar(ImGuiStyleVar_ButtonTextAlign, vector2_new(0.5, 0.5));
-        if ImGui.Button(label .. "##" .. new_name, vector2_new(60, 24)) then
+        if ImGui.Button(label .. "##" .. new_name) then
             data.listening = true;
             internal.keybind_listening = data;
         end;
-        ImGui.PopStyleVar();
 
         return data.key;
     end;
@@ -512,7 +451,7 @@ do
         ImGui.Text(split_name);
         ImGui.SameLine();
         
-        if ImGui.ColorButton("##" .. new_name, color, ImGuiColorEditFlags_NoTooltip, vector2_new(40, 20)) then
+        if ImGui.ColorButton("##" .. new_name, color, ImGuiColorEditFlags_NoTooltip, vector2_new(30, 20)) then
             data.visible = not data.visible;
         end;
 
@@ -524,7 +463,7 @@ do
 
             local r, g, b = color.R, color.G, color.B;
             local r255, g255, b255 = floor(r * 255), floor(g * 255), floor(b * 255);
-            ImGui.Text(to_hex(r255, g255, b255) .. `\nR: {r255}, G: {g255}, B: {b255}\n({format("%.3f", r)}, {format("%.3f", g)}, {format("%.3f", b)})`);
+            ImGui.Text(to_hex(r255, g255, b255) .. "\nR: " .. r255 .. ", G: " .. g255 .. ", B: " .. b255);
             ImGui.EndTooltip();
         end;
 
@@ -533,7 +472,9 @@ do
 
             ImGui.SetNextWindowPos(position, ImGuiCond_Appearing);
             local drawn = ImGui.Begin(split_name .. "###COLORPICKER" .. new_name, nil, ImGuiWindowFlags_NoResize + ImGuiWindowFlags_AlwaysAutoResize + ImGuiWindowFlags_NoCollapse);
-            data.color = ImGui.ColorPicker3("Color Picker##COLORPICKER" .. noise, color, ImGuiColorEditFlags_NoLabel);
+            if drawn then
+                data.color = ImGui.ColorPicker3("Color Picker##COLORPICKER" .. noise, color, ImGuiColorEditFlags_NoLabel);
+            end;
             ImGui.End();
 
             if not drawn then
@@ -556,7 +497,7 @@ do
         ImGui.Text(split_name);
         ImGui.SameLine();
         
-        if ImGui.ColorButton("##" .. new_name, color, ImGuiColorEditFlags_NoTooltip, vector2_new(40, 20)) then
+        if ImGui.ColorButton("##" .. new_name, color, ImGuiColorEditFlags_NoTooltip, vector2_new(30, 20)) then
             data.visible = not data.visible;
         end;
 
@@ -568,7 +509,7 @@ do
 
             local r, g, b = color.R, color.G, color.B;
             local r255, g255, b255, a255 = floor(r * 255), floor(g * 255), floor(b * 255), floor(alpha * 255);
-            ImGui.Text(to_hex(r255, g255, b255, a255) .. `\nR: {r255}, G: {g255}, B: {b255}, A: {a255}\n({format("%.3f", r)}, {format("%.3f", g)}, {format("%.3f", b)}, {format("%.3f", alpha)})`);
+            ImGui.Text(to_hex(r255, g255, b255, a255) .. "\nR: " .. r255 .. ", G: " .. g255 .. ", B: " .. b255 .. ", A: " .. a255);
             ImGui.EndTooltip();
         end;
 
@@ -577,8 +518,10 @@ do
 
             ImGui.SetNextWindowPos(position, ImGuiCond_Appearing);
             local drawn = ImGui.Begin(split_name .. "###COLORPICKER" .. new_name, nil, ImGuiWindowFlags_NoResize + ImGuiWindowFlags_AlwaysAutoResize + ImGuiWindowFlags_NoCollapse);
-            data.color = ImGui.ColorPicker3("Color Picker##COLORPICKER" .. noise, color, ImGuiColorEditFlags_NoLabel);
-            data.alpha = ImGui.SliderFloat("Opacity##COLORPICKER" .. noise, alpha, 0, 1, "%.2f");
+            if drawn then
+                data.color = ImGui.ColorPicker3("Color Picker##COLORPICKER" .. noise, color, ImGuiColorEditFlags_NoLabel);
+                data.alpha = ImGui.SliderFloat("Opacity##COLORPICKER" .. noise, alpha, 0, 1, "%.2f");
+            end;
             ImGui.End();
 
             if not drawn then
