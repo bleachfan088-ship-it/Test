@@ -10,7 +10,6 @@ local internal = {
     tab_list = {};
     tab = 1;
     sized = false;
-    keybind_listening = nil;
     always_on_top = false;
     visible = true;
 };
@@ -30,6 +29,43 @@ do
     noise = "ImGuiLibrary" .. concat(noise_data);
     clear(noise_data);
 end;
+
+-- ==========================================================
+-- KEYBIND SYSTEM
+-- ==========================================================
+local VK = {
+    A = 0x41, B = 0x42, C = 0x43, D = 0x44, E = 0x45,
+    F = 0x46, G = 0x47, H = 0x48, I = 0x49, J = 0x4A,
+    K = 0x4B, L = 0x4C, M = 0x4D, N = 0x4E, O = 0x4F,
+    P = 0x50, Q = 0x51, R = 0x52, S = 0x53, T = 0x54,
+    U = 0x55, V = 0x56, W = 0x57, X = 0x58, Y = 0x59,
+    Z = 0x5A,
+    One = 0x31, Two = 0x32, Three = 0x33, Four = 0x34,
+    Five = 0x35, Six = 0x36, Seven = 0x37, Eight = 0x38,
+    Nine = 0x39, Zero = 0x30,
+    Space = 0x20, LeftControl = 0xA2, LeftShift = 0xA0,
+    LeftAlt = 0x12, Tab = 0x09, Enter = 0x0D,
+    Escape = 0x1B, Backspace = 0x08,
+    F1 = 0x70, F2 = 0x71, F3 = 0x72, F4 = 0x73,
+    F5 = 0x74, F6 = 0x75, F7 = 0x76, F8 = 0x77,
+    F9 = 0x78, F10 = 0x79, F11 = 0x7A, F12 = 0x7B,
+    Mouse1 = 0x01, Mouse2 = 0x02, Mouse3 = 0x04,
+};
+
+local function IsDown(code)
+    local success, result = pcall(function()
+        return is_key_down(code)
+    end)
+    return success and result
+end
+
+local function GetPressedKey()
+    for name, code in pairs(VK) do
+        if IsDown(code) then
+            return name
+        end
+    end
+end
 
 -- ==========================================================
 -- THEME
@@ -56,10 +92,6 @@ end;
 
 function library.set_always_on_top(state)
     internal.always_on_top = state;
-end;
-
-function library.toggle_always_on_top()
-    internal.always_on_top = not internal.always_on_top;
 end;
 
 -- Colors
@@ -104,37 +136,6 @@ end;
 local function pop_accent_text()
     ImGui.PopStyleColor(1);
 end;
-
--- Keybind System
-local UserInputService = game:GetService("UserInputService");
-local VirtualInputManager = game:GetService("VirtualInputManager");
-
--- F1 Toggle
-UserInputService.InputBegan:Connect(function(input, game_processed)
-    if game_processed then return end;
-    
-    -- F1 key to toggle UI visibility
-    if input.KeyCode == Enum.KeyCode.F1 then
-        internal.visible = not internal.visible;
-        return;
-    end;
-    
-    -- Keybind listening
-    local target = internal.keybind_listening;
-    if not target then return end;
-    
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        target.key = input.KeyCode;
-        target.listening = false;
-        internal.keybind_listening = nil;
-    elseif input.UserInputType == Enum.UserInputType.MouseButton1 or
-           input.UserInputType == Enum.UserInputType.MouseButton2 or
-           input.UserInputType == Enum.UserInputType.MouseButton3 then
-        target.key = input.UserInputType;
-        target.listening = false;
-        internal.keybind_listening = nil;
-    end;
-end);
 
 -- UI Functions
 do
@@ -336,23 +337,32 @@ do
             ImGui.SameLine();
         end;
         
-        local display = "None";
-        if ref.listening then
-            display = "...";
-        elseif ref.key then
-            display = ref.key.Name;
+        -- Check if key is held down
+        local code = VK[ref.Key];
+        if code and IsDown(code) then
+            ref.Down = true;
+        else
+            ref.Down = false;
         end;
         
-        if ImGui.Button(display .. "##" .. library.format_name(name)) then
-            ref.listening = not ref.listening;
-            if ref.listening then
-                internal.keybind_listening = ref;
-            else
-                internal.keybind_listening = nil;
+        -- Display current key or listening state
+        if ref.Listening then
+            ImGui.TextColored(ImGui.GetColorU32(1, 1, 0, 1), "...");
+            ImGui.SameLine();
+            
+            -- Check for key press
+            local pressed = GetPressedKey();
+            if pressed then
+                ref.Key = pressed;
+                ref.Listening = false;
+            end;
+        else
+            if ImGui.Button(ref.Key .. "##" .. library.format_name(name)) then
+                ref.Listening = true;
             end;
         end;
         
-        return ref.key;
+        return ref.Key, ref.Down;
     end;
     
     function library.dropdown(name, options)
