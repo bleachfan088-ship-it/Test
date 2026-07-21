@@ -9,7 +9,8 @@ local internal = {
     section = "";
     tab_list = {};
     tab = 1;
-    group = 1;
+    sized = false;
+    keybind_listening = nil;
 };
 
 local vector2_new, vector2_zero = Vector2.new, Vector2.zero;
@@ -31,16 +32,78 @@ end;
 
 -- ==========================================================
 -- THEME
--- Your executor's ImGui binding doesn't expose PushStyleColor /
--- PushStyleVar (they weren't in the original script, and calling
--- them errors), so no actual style-injection API is used here.
--- The "modern" look comes only from layout/structure using the
--- same functions the original script already called
--- (Begin, Button, Text, Selectable, ColorButton, BeginChild...).
--- accent_color is only ever passed into ImGui.ColorButton, which
--- was already used in the original script.
+-- Confirmed working: ImGui.PushStyleColor / ImGui.PopStyleColor
+-- (your executor errored specifically on PushStyleVar, one line
+-- after the last PushStyleColor call - so only PushStyleColor is
+-- used here, never PushStyleVar/PopStyleVar).
 -- ==========================================================
-local accent_color = color3_new(0.35, 0.55, 1.00);
+local presets = {
+    Blue   = { accent = color3_new(0.30, 0.55, 1.00), hover = color3_new(0.42, 0.63, 1.00), active = color3_new(0.24, 0.46, 0.92) };
+    Purple = { accent = color3_new(0.60, 0.35, 1.00), hover = color3_new(0.68, 0.46, 1.00), active = color3_new(0.50, 0.28, 0.92) };
+    Green  = { accent = color3_new(0.30, 0.85, 0.45), hover = color3_new(0.42, 0.92, 0.55), active = color3_new(0.22, 0.72, 0.36) };
+};
+
+local current_theme = "Blue";
+
+function library.set_theme(name)
+    if presets[name] then
+        current_theme = name;
+    end;
+end;
+
+local bg            = color3_new(0.07, 0.07, 0.09);
+local bg_secondary  = color3_new(0.11, 0.11, 0.14);
+local bg_child      = color3_new(0.09, 0.09, 0.115);
+local border_color  = color3_new(0.18, 0.18, 0.22);
+local text_color    = color3_new(0.90, 0.90, 0.94);
+local pushed_colors = 0;
+
+local function push_theme()
+    local t = presets[current_theme];
+    local n = 0;
+
+    local function push(col, value)
+        ImGui.PushStyleColor(col, value);
+        n += 1;
+    end;
+
+    push(ImGuiCol_WindowBg, bg);
+    push(ImGuiCol_ChildBg, bg_child);
+    push(ImGuiCol_Border, border_color);
+    push(ImGuiCol_Text, text_color);
+
+    push(ImGuiCol_Button, bg_secondary);
+    push(ImGuiCol_ButtonHovered, t.hover);
+    push(ImGuiCol_ButtonActive, t.active);
+
+    push(ImGuiCol_FrameBg, bg_secondary);
+    push(ImGuiCol_FrameBgHovered, bg_secondary);
+    push(ImGuiCol_FrameBgActive, bg_secondary);
+
+    push(ImGuiCol_Header, t.active);
+    push(ImGuiCol_HeaderHovered, t.hover);
+    push(ImGuiCol_HeaderActive, t.accent);
+
+    push(ImGuiCol_SliderGrab, t.accent);
+    push(ImGuiCol_SliderGrabActive, t.hover);
+    push(ImGuiCol_CheckMark, t.accent);
+    push(ImGuiCol_Separator, border_color);
+
+    pushed_colors = n;
+end;
+
+local function pop_theme()
+    ImGui.PopStyleColor(pushed_colors);
+end;
+
+-- push/pop just the text color, used to highlight the active tab
+-- and group headers without any extra decorative icons
+local function push_accent_text()
+    ImGui.PushStyleColor(ImGuiCol_Text, presets[current_theme].accent);
+end;
+local function pop_accent_text()
+    ImGui.PopStyleColor(1);
+end;
 
 do
 
@@ -48,6 +111,8 @@ do
         if (not isoverlayactive()) then
             return;
         end;
+
+        push_theme();
 
         if not internal.sized then
             ImGui.SetNextWindowSize(vector2_new(680, 420));
@@ -58,12 +123,12 @@ do
         local tab_list = internal.tab_list;
         local window_size = ImGui.GetWindowSize();
 
-        -- top bar: small accent square as a "brand mark", then the
-        -- brand name, then the tab buttons on the same line
+        -- top bar: brand name, then tab buttons (active tab is
+        -- highlighted by its own text color, no icons)
         do
-            ImGui.ColorButton("##brand" .. noise, accent_color, ImGuiColorEditFlags_NoTooltip, vector2_new(14, 14));
-            ImGui.SameLine();
+            push_accent_text();
             ImGui.Text(library.name);
+            pop_accent_text();
             ImGui.SameLine();
             ImGui.Text("|");
             ImGui.SameLine();
@@ -73,15 +138,16 @@ do
                 local tab = tab_list[i];
                 local is_active = (internal.tab == i);
 
-                -- mark the active tab without style-pushing: a small
-                -- accent-colored dot in front of its label
                 if is_active then
-                    ImGui.ColorButton("##active" .. i .. noise, accent_color, ImGuiColorEditFlags_NoTooltip, vector2_new(8, 8));
-                    ImGui.SameLine();
+                    push_accent_text();
                 end;
 
                 if ImGui.Button(tab.name) then
                     internal.tab = i;
+                end;
+
+                if is_active then
+                    pop_accent_text();
                 end;
 
                 if i ~= amount then
@@ -105,9 +171,9 @@ do
             if (ImGui.BeginChild("ColLeft##" .. noise, vector2_new(col_width, y_size), ImGuiChildFlags_Border)) then
                 for i = 1, #groups, 2 do
                     local group = groups[i];
-                    ImGui.ColorButton("##groupmark" .. i .. noise, accent_color, ImGuiColorEditFlags_NoTooltip, vector2_new(10, 10));
-                    ImGui.SameLine();
+                    push_accent_text();
                     ImGui.Text(group.name);
+                    pop_accent_text();
                     ImGui.Separator();
                     group.callback();
                     if groups[i + 2] then
@@ -119,9 +185,9 @@ do
             if (ImGui.BeginChild("ColRight##" .. noise, vector2_new(col_width, y_size), ImGuiChildFlags_Border)) then
                 for i = 2, #groups, 2 do
                     local group = groups[i];
-                    ImGui.ColorButton("##groupmark" .. i .. noise, accent_color, ImGuiColorEditFlags_NoTooltip, vector2_new(10, 10));
-                    ImGui.SameLine();
+                    push_accent_text();
                     ImGui.Text(group.name);
+                    pop_accent_text();
                     ImGui.Separator();
                     group.callback();
                     if groups[i + 2] then
@@ -132,6 +198,8 @@ do
         end;
 
         ImGui.End();
+
+        pop_theme();
     end;
 
     function library.add_tab(name)
@@ -264,6 +332,64 @@ do
             ImGui.Text(split_name);
         end;
         return ImGui.SliderFloat("##" .. new_name, value, min, max, format or "%.3f");
+    end;
+
+    -- ======================================================
+    -- KEYBIND PICKER (new - built only from ImGui functions
+    -- already used elsewhere in this file, plus Roblox's
+    -- standard UserInputService; no invented ImGui API)
+    -- ======================================================
+    local UserInputService = game:GetService("UserInputService");
+
+    UserInputService.InputBegan:Connect(function(input, game_processed)
+        local target = internal.keybind_listening;
+        if not target then
+            return;
+        end;
+
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            target.key = input.KeyCode;
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.MouseButton2
+            or input.UserInputType == Enum.UserInputType.MouseButton3 then
+            target.key = input.UserInputType;
+        else
+            return;
+        end;
+
+        target.listening = false;
+        internal.keybind_listening = nil;
+    end);
+
+    -- data = { key = Enum.KeyCode.E (or nil), listening = false }
+    function library.keybind(name, data)
+        if data.listening == nil then
+            data.listening = false;
+        end;
+
+        local new_name = library.format_name(name);
+        local split_name = library.split_name(name);
+
+        if (#split_name ~= 0) then
+            ImGui.Text(split_name);
+            ImGui.SameLine();
+        end;
+
+        local label;
+        if data.listening then
+            label = "...";
+        elseif data.key then
+            label = data.key.Name;
+        else
+            label = "None";
+        end;
+
+        if ImGui.Button(label .. "##" .. new_name) then
+            data.listening = true;
+            internal.keybind_listening = data;
+        end;
+
+        return data.key;
     end;
 
     local function hex(n)
