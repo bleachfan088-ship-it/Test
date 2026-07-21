@@ -37,31 +37,26 @@ local presets = {
         accent = color3_new(0.20, 0.60, 1.00), 
         hover = color3_new(0.30, 0.70, 1.00), 
         active = color3_new(0.15, 0.50, 0.90),
-        accent2 = color3_new(0.10, 0.40, 0.80),
     };
     Purple = { 
         accent = color3_new(0.70, 0.35, 1.00), 
         hover = color3_new(0.78, 0.46, 1.00), 
         active = color3_new(0.60, 0.28, 0.92),
-        accent2 = color3_new(0.50, 0.20, 0.80),
     };
     Green  = { 
         accent = color3_new(0.20, 0.85, 0.45), 
         hover = color3_new(0.30, 0.92, 0.55), 
         active = color3_new(0.15, 0.72, 0.36),
-        accent2 = color3_new(0.10, 0.65, 0.30),
     };
     Red    = { 
         accent = color3_new(1.00, 0.25, 0.25), 
         hover = color3_new(1.00, 0.35, 0.35), 
         active = color3_new(0.90, 0.15, 0.15),
-        accent2 = color3_new(0.80, 0.10, 0.10),
     };
     Orange = { 
         accent = color3_new(1.00, 0.60, 0.15), 
         hover = color3_new(1.00, 0.70, 0.25), 
         active = color3_new(0.90, 0.50, 0.10),
-        accent2 = color3_new(0.80, 0.40, 0.05),
     };
 };
 
@@ -122,7 +117,30 @@ end;
 
 local function pop_muted_text()
     ImGui.PopStyleColor(1);
-end;
+end
+
+-- Keybind system
+local UserInputService = game:GetService("UserInputService");
+
+UserInputService.InputBegan:Connect(function(input, game_processed)
+    local target = internal.keybind_listening;
+    if not target then
+        return;
+    end;
+
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        target.key = input.KeyCode;
+    elseif input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.MouseButton2
+        or input.UserInputType == Enum.UserInputType.MouseButton3 then
+        target.key = input.UserInputType;
+    else
+        return;
+    end;
+
+    target.listening = false;
+    internal.keybind_listening = nil;
+end);
 
 do
     function library.on_render()
@@ -144,7 +162,6 @@ do
 
         -- Top bar
         do
-            -- Title
             push_accent_text();
             ImGui.Text(library.name);
             pop_accent_text();
@@ -155,7 +172,6 @@ do
             pop_muted_text();
             ImGui.SameLine();
 
-            -- Tab buttons
             local amount = #tab_list;
             for i = 1, amount do
                 local tab = tab_list[i];
@@ -369,29 +385,6 @@ do
         return ImGui.SliderFloat("##" .. new_name, value, min, max, format or "%.1f°");
     end;
 
-    -- Keybind system
-    local UserInputService = game:GetService("UserInputService");
-
-    UserInputService.InputBegan:Connect(function(input, game_processed)
-        local target = internal.keybind_listening;
-        if not target then
-            return;
-        end;
-
-        if input.UserInputType == Enum.UserInputType.Keyboard then
-            target.key = input.KeyCode;
-        elseif input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.MouseButton2
-            or input.UserInputType == Enum.UserInputType.MouseButton3 then
-            target.key = input.UserInputType;
-        else
-            return;
-        end;
-
-        target.listening = false;
-        internal.keybind_listening = nil;
-    end);
-
     function library.keybind(name, data)
         if data.listening == nil then
             data.listening = false;
@@ -455,29 +448,13 @@ do
             data.visible = not data.visible;
         end;
 
-        if ImGui.BeginItemTooltip("##TOOLTIP"..new_name) then
-            ImGui.Text(split_name);
-            ImGui.Separator();
-            ImGui.ColorButton("##color", color, ImGuiColorEditFlags_NoTooltip, vector2_new(50, 50)); 
-            ImGui.SameLine();
-
-            local r, g, b = color.R, color.G, color.B;
-            local r255, g255, b255 = floor(r * 255), floor(g * 255), floor(b * 255);
-            ImGui.Text(to_hex(r255, g255, b255) .. "\nR: " .. r255 .. ", G: " .. g255 .. ", B: " .. b255);
-            ImGui.EndTooltip();
-        end;
-
         if data.visible then
-            local position = ImGui.GetWindowPos() + ImGui.GetCursorPos();
-
-            ImGui.SetNextWindowPos(position, ImGuiCond_Appearing);
-            local drawn = ImGui.Begin(split_name .. "###COLORPICKER" .. new_name, nil, ImGuiWindowFlags_NoResize + ImGuiWindowFlags_AlwaysAutoResize + ImGuiWindowFlags_NoCollapse);
-            if drawn then
-                data.color = ImGui.ColorPicker3("Color Picker##COLORPICKER" .. noise, color, ImGuiColorEditFlags_NoLabel);
-            end;
-            ImGui.End();
-
-            if not drawn then
+            ImGui.SetNextWindowPos(ImGui.GetWindowPos() + ImGui.GetCursorPos(), ImGuiCond_Appearing);
+            local open = ImGui.Begin(split_name .. "###COLORPICKER" .. new_name, nil, ImGuiWindowFlags_NoResize + ImGuiWindowFlags_AlwaysAutoResize + ImGuiWindowFlags_NoCollapse);
+            if open then
+                data.color = ImGui.ColorPicker3("##COLORPICKER" .. noise, color, ImGuiColorEditFlags_NoLabel);
+                ImGui.End();
+            else
                 data.visible = false;
             end;
         end;
@@ -501,30 +478,14 @@ do
             data.visible = not data.visible;
         end;
 
-        if ImGui.BeginItemTooltip("##TOOLTIP"..new_name) then
-            ImGui.Text(split_name);
-            ImGui.Separator();
-            ImGui.ColorButton("##color", color, ImGuiColorEditFlags_NoTooltip, vector2_new(50, 50)); 
-            ImGui.SameLine();
-
-            local r, g, b = color.R, color.G, color.B;
-            local r255, g255, b255, a255 = floor(r * 255), floor(g * 255), floor(b * 255), floor(alpha * 255);
-            ImGui.Text(to_hex(r255, g255, b255, a255) .. "\nR: " .. r255 .. ", G: " .. g255 .. ", B: " .. b255 .. ", A: " .. a255);
-            ImGui.EndTooltip();
-        end;
-
         if data.visible then
-            local position = ImGui.GetWindowPos() + ImGui.GetCursorPos();
-
-            ImGui.SetNextWindowPos(position, ImGuiCond_Appearing);
-            local drawn = ImGui.Begin(split_name .. "###COLORPICKER" .. new_name, nil, ImGuiWindowFlags_NoResize + ImGuiWindowFlags_AlwaysAutoResize + ImGuiWindowFlags_NoCollapse);
-            if drawn then
-                data.color = ImGui.ColorPicker3("Color Picker##COLORPICKER" .. noise, color, ImGuiColorEditFlags_NoLabel);
+            ImGui.SetNextWindowPos(ImGui.GetWindowPos() + ImGui.GetCursorPos(), ImGuiCond_Appearing);
+            local open = ImGui.Begin(split_name .. "###COLORPICKER" .. new_name, nil, ImGuiWindowFlags_NoResize + ImGuiWindowFlags_AlwaysAutoResize + ImGuiWindowFlags_NoCollapse);
+            if open then
+                data.color = ImGui.ColorPicker3("##COLORPICKER" .. noise, color, ImGuiColorEditFlags_NoLabel);
                 data.alpha = ImGui.SliderFloat("Opacity##COLORPICKER" .. noise, alpha, 0, 1, "%.2f");
-            end;
-            ImGui.End();
-
-            if not drawn then
+                ImGui.End();
+            else
                 data.visible = false;
             end;
         end;
