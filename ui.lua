@@ -23,7 +23,7 @@ local insert, concat, clear = table.insert, table.concat, table.clear;
 local random, floor = math.random, math.floor;
 local char, find, split = string.char, string.find, string.split;
 
--- Unique ID generator to prevent ImGui element ID collision
+-- Unique ID generator
 local noise;
 do
     local noise_data = {};
@@ -56,7 +56,6 @@ local VK = {
     Mouse1 = 0x01, Mouse2 = 0x02, Mouse3 = 0x04,
 };
 
--- Dual-compatible key down checker (string key name or VK hex code)
 local function IsDown(key_identifier)
     if not key_identifier then return false end
     
@@ -170,8 +169,12 @@ local function set_ref_val(ref, new_val)
     return new_val
 end
 
+-- Child Window Border Flag Constants (1 for border, 0 for no border)
+local CHILD_BORDER = ImGuiChildFlags_Border or 1
+local CHILD_NO_BORDER = 0
+
 -- ==========================================================
--- UI RENDER ENGINE (REDESIGNED FRONTEND)
+-- UI RENDER ENGINE
 -- ==========================================================
 do
     function library.on_render()
@@ -196,9 +199,9 @@ do
             internal.sized = true;
         end;
         
-        local flags = ImGuiWindowFlags_NoTitleBar;
+        local flags = ImGuiWindowFlags_NoTitleBar or 1;
         if internal.always_on_top then
-            flags = flags + ImGuiWindowFlags_NoMove;
+            flags = flags + (ImGuiWindowFlags_NoMove or 4);
         end;
         
         ImGui.Begin(library.name .. "###" .. noise, nil, flags);
@@ -243,7 +246,7 @@ do
         -- ------------------------------------------------------
         -- 2. LEFT SIDEBAR (VERTICAL NAVIGATION)
         -- ------------------------------------------------------
-        ImGui.BeginChild("Sidebar##" .. noise, vector2_new(sidebar_width, content_height), ImGuiChildFlags_Border);
+        ImGui.BeginChild("Sidebar##" .. noise, vector2_new(sidebar_width, content_height), CHILD_BORDER);
         
         ImGui.Indent(5);
         ImGui.TextDisabled("NAVIGATION");
@@ -272,10 +275,10 @@ do
         ImGui.SameLine();
         
         -- ------------------------------------------------------
-        -- 3. MAIN CONTENT AREA (CARDS / GROUP BOXES)
+        -- 3. MAIN CONTENT AREA
         -- ------------------------------------------------------
         local main_width = window_size.X - sidebar_width - 25;
-        ImGui.BeginChild("MainArea##" .. noise, vector2_new(main_width, content_height), false);
+        ImGui.BeginChild("MainArea##" .. noise, vector2_new(main_width, content_height), CHILD_NO_BORDER);
         
         local current_tab = internal.tab_list[internal.tab];
         if current_tab then
@@ -287,9 +290,9 @@ do
             
             local groups = current_tab.data;
             
-            -- Render Groups as Clean Cards / Bordered Containers
+            -- Render Groups as Cards
             for i, group in ipairs(groups) do
-                ImGui.BeginChild("GroupCard_" .. i .. "##" .. noise, vector2_new(main_width - 5, 0), ImGuiChildFlags_Border + ImGuiChildFlags_AutoResizeY);
+                ImGui.BeginChild("GroupCard_" .. i .. "##" .. noise, vector2_new(main_width - 5, 0), CHILD_BORDER);
                 
                 push_accent_text();
                 ImGui.Text(group.name);
@@ -313,8 +316,6 @@ do
         
         ImGui.Indent(10);
         ImGui.TextDisabled("Theme: " .. current_theme);
-        ImGui.SameLine();
-        ImGui.TextDisabled("|  FPS: " .. tostring(floor(1 / (delta_time or 0.016))))
         ImGui.SameLine();
         ImGui.TextDisabled("|  Build: " .. (library.build or "Release"));
         ImGui.Unindent(10);
