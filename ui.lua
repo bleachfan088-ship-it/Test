@@ -35,7 +35,7 @@ do
 end;
 
 -- ==========================================================
--- VK KEY CODES & INPUT HANDLING
+-- VK KEY CODES & EXACT INPUT HANDLING
 -- ==========================================================
 local VK = {
     A = 0x41, B = 0x42, C = 0x43, D = 0x44, E = 0x45,
@@ -44,9 +44,11 @@ local VK = {
     P = 0x50, Q = 0x51, R = 0x52, S = 0x53, T = 0x54,
     U = 0x55, V = 0x56, W = 0x57, X = 0x58, Y = 0x59,
     Z = 0x5A,
+
     One = 0x31, Two = 0x32, Three = 0x33, Four = 0x34,
     Five = 0x35, Six = 0x36, Seven = 0x37, Eight = 0x38,
     Nine = 0x39, Zero = 0x30,
+
     Space = 0x20, LeftControl = 0xA2, LeftShift = 0xA0,
     LeftAlt = 0x12, Tab = 0x09, Enter = 0x0D,
     Escape = 0x1B, Backspace = 0x08,
@@ -55,28 +57,19 @@ local VK = {
     F9 = 0x78, F10 = 0x79, F11 = 0x7A, F12 = 0x7B,
 };
 
-local function IsDown(key_identifier)
-    if not key_identifier then return false end
-    
-    local success, result = pcall(is_key_down, key_identifier)
-    if success and result then return true end
-    
-    local code = VK[key_identifier] or (typeof(key_identifier) == "number" and key_identifier)
-    if code then
-        success, result = pcall(is_key_down, code)
-        if success and result then return true end
-    end
-    
-    return false
+local function IsDown(code)
+    local success, result = pcall(function()
+        return is_key_down(code)
+    end)
+    return success and result
 end
 
 local function GetPressedKey()
-    for name, _ in pairs(VK) do
-        if IsDown(name) then
+    for name, code in pairs(VK) do
+        if IsDown(code) then
             return name
         end
     end
-    return nil
 end
 
 -- ==========================================================
@@ -111,7 +104,7 @@ function library.get_ui_keybind()
     return internal.ui_keybind;
 end;
 
--- Classic Dark Grey Palette
+-- Palette
 local bg = color3_new(0.12, 0.12, 0.14);
 local bg_secondary = color3_new(0.18, 0.18, 0.22);
 local bg_child = color3_new(0.15, 0.15, 0.18);
@@ -182,13 +175,16 @@ do
     function library.on_render()
         if isoverlayactive and not isoverlayactive() then return end;
         
-        -- Default F1 Toggle Key Handler
-        if IsDown(internal.ui_keybind.Key) then
+        -- Main Open/Close Keybind Check (VK Code)
+        local main_code = VK[internal.ui_keybind.Key];
+        if main_code and IsDown(main_code) then
+            internal.ui_keybind.Down = true;
             if not internal.ui_keybind._pressed then
                 internal.ui_keybind._pressed = true;
                 internal.visible = not internal.visible;
             end
         else
+            internal.ui_keybind.Down = false;
             internal.ui_keybind._pressed = false;
         end
         
@@ -344,7 +340,7 @@ do
     end;
     
     -- ------------------------------------------------------
-    -- CONTROLS IMPLEMENTATION (FIXED RETURN SIGNATURES)
+    -- CONTROLS IMPLEMENTATION
     -- ------------------------------------------------------
     function library.toggle(name, ref)
         local current_state = get_ref_val(ref)
@@ -402,6 +398,7 @@ do
         return new_val
     end;
     
+    -- EXACT KEYBIND IMPLEMENTATION
     function library.keybind(name, ref)
         local label = library.split_name(name);
         if #label > 0 then
@@ -409,29 +406,25 @@ do
             ImGui.SameLine();
         end;
         
-        ref.Down = IsDown(ref.Key);
-        
         if ref.Listening then
-            if ImGui.Button("[ Press Key... ]##" .. library.format_name(name)) then
-                ref.Listening = false;
-                ref._skip = nil
-            end
+            ImGui.TextColored(ImGui.GetColorU32(1, 1, 0, 1), "Press a key...");
             
-            if ref._skip then
-                ref._skip = ref._skip - 1
-                if ref._skip <= 0 then ref._skip = nil end
-            else
-                local key_pressed = GetPressedKey();
-                if key_pressed then
-                    ref.Key = key_pressed;
-                    ref.Listening = false;
-                end;
-            end
-        else
-            if ImGui.Button("[" .. (ref.Key or "None") .. "]##" .. library.format_name(name)) then
-                ref.Listening = true;
-                ref._skip = 5;
+            local pressed = GetPressedKey();
+            if pressed then
+                ref.Key = pressed;
+                ref.Listening = false;
             end;
+        else
+            if ImGui.Button((ref.Key or "None") .. "##" .. library.format_name(name)) then
+                ref.Listening = true;
+            end;
+        end;
+        
+        local code = VK[ref.Key];
+        if code and IsDown(code) then
+            ref.Down = true;
+        else
+            ref.Down = false;
         end;
         
         return ref.Key, ref.Down;
@@ -518,6 +511,8 @@ do
                 ref.visible = false;
             end;
         end;
+        
+        return ref.color;
     end;
 end;
 
