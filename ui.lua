@@ -215,7 +215,7 @@ do
         local content_height = window_size.Y - header_height - footer_height - 20;
         
         -- ------------------------------------------------------
-        -- 1. TOP HEADER BAR (Clean ASCII - No ?? symbols)
+        -- 1. TOP HEADER BAR
         -- ------------------------------------------------------
         push_accent_text();
         ImGui.Text(library.name);
@@ -224,7 +224,6 @@ do
         ImGui.SameLine();
         ImGui.TextColored(ImGui.GetColorU32(0.55, 0.55, 0.60, 1), library.version or "v1.0");
         
-        -- Clean [X] Close Button
         local close_btn_size = 26;
         ImGui.SetCursorPos(vector2_new(window_size.X - close_btn_size - 10, 4));
         if ImGui.Button("[X]##close" .. noise) then
@@ -235,7 +234,7 @@ do
         ImGui.Separator();
         
         -- ------------------------------------------------------
-        -- 2. LEFT SIDEBAR (No ? symbol tab labels)
+        -- 2. LEFT SIDEBAR
         -- ------------------------------------------------------
         ImGui.BeginChild("Sidebar##" .. noise, vector2_new(sidebar_width, content_height), CHILD_BORDER);
         
@@ -345,18 +344,14 @@ do
     end;
     
     -- ------------------------------------------------------
-    -- CONTROLS IMPLEMENTATION
+    -- CONTROLS IMPLEMENTATION (FIXED RETURN SIGNATURES)
     -- ------------------------------------------------------
     function library.toggle(name, ref)
         local current_state = get_ref_val(ref)
-        local changed, new_val = ImGui.Checkbox(library.format_name(name), current_state)
-        if changed ~= nil then
-            set_ref_val(ref, changed)
-            return changed
-        else
-            set_ref_val(ref, new_val)
-            return new_val
-        end
+        if typeof(current_state) ~= "boolean" then current_state = false end
+        local new_val, changed = ImGui.Checkbox(library.format_name(name), current_state)
+        set_ref_val(ref, new_val)
+        return new_val
     end;
     
     function library.separator()
@@ -376,9 +371,9 @@ do
         if #label > 0 then
             ImGui.Text(label);
         end;
-        local current_val = get_ref_val(ref) or min
-        local res1, res2 = ImGui.SliderInt("##" .. library.format_name(name), current_val, min, max, format or "%i");
-        local new_val = res2 or res1
+        local current_val = get_ref_val(ref)
+        if typeof(current_val) ~= "number" then current_val = min end
+        local new_val, changed = ImGui.SliderInt("##" .. library.format_name(name), current_val, min, max, format or "%i");
         set_ref_val(ref, new_val)
         return new_val
     end;
@@ -388,9 +383,9 @@ do
         if #label > 0 then
             ImGui.Text(label);
         end;
-        local current_val = get_ref_val(ref) or min
-        local res1, res2 = ImGui.SliderFloat("##" .. library.format_name(name), current_val, min, max, format or "%.2f");
-        local new_val = res2 or res1
+        local current_val = get_ref_val(ref)
+        if typeof(current_val) ~= "number" then current_val = min end
+        local new_val, changed = ImGui.SliderFloat("##" .. library.format_name(name), current_val, min, max, format or "%.2f");
         set_ref_val(ref, new_val)
         return new_val
     end;
@@ -400,9 +395,9 @@ do
         if #label > 0 then
             ImGui.Text(label);
         end;
-        local current_val = get_ref_val(ref) or min
-        local res1, res2 = ImGui.SliderAngle("##" .. library.format_name(name), current_val, min, max, format or "%.1f°");
-        local new_val = res2 or res1
+        local current_val = get_ref_val(ref)
+        if typeof(current_val) ~= "number" then current_val = min end
+        local new_val, changed = ImGui.SliderAngle("##" .. library.format_name(name), current_val, min, max, format or "%.1f°");
         set_ref_val(ref, new_val)
         return new_val
     end;
@@ -422,7 +417,6 @@ do
                 ref._skip = nil
             end
             
-            -- Skip frames after button click so mouse click doesn't bind
             if ref._skip then
                 ref._skip = ref._skip - 1
                 if ref._skip <= 0 then ref._skip = nil end
@@ -436,14 +430,13 @@ do
         else
             if ImGui.Button("[" .. (ref.Key or "None") .. "]##" .. library.format_name(name)) then
                 ref.Listening = true;
-                ref._skip = 5; -- Ignore mouse click for 5 frames
+                ref._skip = 5;
             end;
         end;
         
         return ref.Key, ref.Down;
     end;
     
-    -- Helper to place the main UI toggle keybind anywhere in settings
     function library.ui_keybind_picker(label_name)
         return library.keybind(label_name or "Menu Toggle Key", internal.ui_keybind);
     end;
