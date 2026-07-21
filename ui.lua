@@ -160,7 +160,7 @@ do
         -- Set always on top flag
         local flags = ImGuiWindowFlags_NoTitleBar;
         if internal.always_on_top then
-            flags = flags + ImGuiWindowFlags_AlwaysAutoResize + 0x00000020; -- ImGuiWindowFlags_NoMove
+            flags = flags + 0x00000020; -- ImGuiWindowFlags_NoMove
         end;
         
         ImGui.Begin(library.name .. "###" .. noise, nil, flags);
@@ -180,14 +180,15 @@ do
             ImGui.PushStyleColor(ImGuiCol_Button, presets[current_theme].accent);
             ImGui.PushStyleColor(ImGuiCol_ButtonHovered, presets[current_theme].hover);
             ImGui.PushStyleColor(ImGuiCol_ButtonActive, presets[current_theme].active);
+            ImGui.PushStyleColor(ImGuiCol_Text, color3_new(1, 1, 1));
         end;
         
-        if ImGui.Button("📌" .. (internal.always_on_top and " ON" or " OFF") .. "##pin" .. noise) then
+        if ImGui.Button("📌##pin" .. noise) then
             internal.always_on_top = not internal.always_on_top;
         end;
         
         if internal.always_on_top then
-            ImGui.PopStyleColor(3);
+            ImGui.PopStyleColor(4);
         end;
         
         ImGui.SameLine();
