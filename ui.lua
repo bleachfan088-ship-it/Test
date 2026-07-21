@@ -3,7 +3,7 @@ if not (ImGui) then
 end;
 
 local library = {
-    name = "AIMBOT";
+    name = "Imgui lib";
 };
 
 local internal = {
