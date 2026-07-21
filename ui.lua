@@ -11,6 +11,8 @@ local internal = {
     tab = 1;
     sized = false;
     keybind_listening = nil;
+    always_on_top = false;
+    visible = true;
 };
 
 local vector2_new = Vector2.new;
@@ -46,6 +48,18 @@ function library.set_theme(name)
     if presets[name] then
         current_theme = name;
     end;
+end;
+
+function library.toggle_visibility()
+    internal.visible = not internal.visible;
+end;
+
+function library.set_always_on_top(state)
+    internal.always_on_top = state;
+end;
+
+function library.toggle_always_on_top()
+    internal.always_on_top = not internal.always_on_top;
 end;
 
 -- Colors
@@ -103,7 +117,17 @@ local function keyrelease(key)
     VirtualInputManager:SendKeyEvent(false, key, false, game);
 end;
 
+-- F1 Toggle
 UserInputService.InputBegan:Connect(function(input, game_processed)
+    if game_processed then return end;
+    
+    -- F1 key to toggle UI visibility
+    if input.KeyCode == Enum.KeyCode.F1 then
+        internal.visible = not internal.visible;
+        return;
+    end;
+    
+    -- Keybind listening
     local target = internal.keybind_listening;
     if not target then return end;
     
@@ -124,6 +148,7 @@ end);
 do
     function library.on_render()
         if not isoverlayactive() then return end;
+        if not internal.visible then return end;
         
         push_theme();
         
@@ -132,11 +157,17 @@ do
             internal.sized = true;
         end;
         
-        ImGui.Begin(library.name .. "###" .. noise, nil, ImGuiWindowFlags_NoTitleBar);
+        -- Set always on top flag
+        local flags = ImGuiWindowFlags_NoTitleBar;
+        if internal.always_on_top then
+            flags = flags + ImGuiWindowFlags_AlwaysAutoResize + 0x00000020; -- ImGuiWindowFlags_NoMove
+        end;
+        
+        ImGui.Begin(library.name .. "###" .. noise, nil, flags);
         
         local window_size = ImGui.GetWindowSize();
         
-        -- Top Bar
+        -- Top Bar with Always On Top toggle
         push_accent_text();
         ImGui.Text(library.name);
         pop_accent_text();
@@ -144,6 +175,31 @@ do
         ImGui.Text("|");
         ImGui.SameLine();
         
+        -- Always On Top toggle button
+        if internal.always_on_top then
+            ImGui.PushStyleColor(ImGuiCol_Button, presets[current_theme].accent);
+            ImGui.PushStyleColor(ImGuiCol_ButtonHovered, presets[current_theme].hover);
+            ImGui.PushStyleColor(ImGuiCol_ButtonActive, presets[current_theme].active);
+        end;
+        
+        if ImGui.Button("📌" .. (internal.always_on_top and " ON" or " OFF") .. "##pin" .. noise) then
+            internal.always_on_top = not internal.always_on_top;
+        end;
+        
+        if internal.always_on_top then
+            ImGui.PopStyleColor(3);
+        end;
+        
+        ImGui.SameLine();
+        
+        -- Close button (F1)
+        if ImGui.Button("✕##close" .. noise) then
+            internal.visible = false;
+        end;
+        
+        ImGui.SameLine();
+        
+        -- Tabs
         for i, tab in ipairs(internal.tab_list) do
             local is_active = internal.tab == i;
             
