@@ -12,13 +12,13 @@ local internal = {
     tab_list = {};
     tab = 1;
     sized = false;
-    always_on_top = false;
+    always_on_top = true; -- Default Always On Top
     visible = true;
     ui_keybind = { Key = "F1", Listening = false, Down = false };
 };
 
 local vector2_new = Vector2.new;
-local color3_new = Color3.new;
+local color3_fromRGB = Color3.fromRGB;
 local insert, concat, clear = table.insert, table.concat, table.clear;
 local random, floor = math.random, math.floor;
 local char, find, split = string.char, string.find, string.split;
@@ -35,7 +35,7 @@ do
 end;
 
 -- ==========================================================
--- VK KEY CODES & EXACT INPUT HANDLING
+-- VK KEY CODES & INPUT HANDLING
 -- ==========================================================
 local VK = {
     A = 0x41, B = 0x42, C = 0x43, D = 0x44, E = 0x45,
@@ -73,15 +73,11 @@ local function GetPressedKey()
 end
 
 -- ==========================================================
--- CLASSIC GREY THEME SYSTEM
+-- CLASSIC 33,33,33 GREY THEME SYSTEM
 -- ==========================================================
 local presets = {
-    Classic = { accent = color3_new(0.48, 0.48, 0.54), hover = color3_new(0.58, 0.58, 0.65), active = color3_new(0.38, 0.38, 0.44) },
-    Grey    = { accent = color3_new(0.55, 0.55, 0.60), hover = color3_new(0.65, 0.65, 0.70), active = color3_new(0.45, 0.45, 0.50) },
-    Blue    = { accent = color3_new(0.20, 0.60, 1.00), hover = color3_new(0.30, 0.70, 1.00), active = color3_new(0.15, 0.50, 0.90) },
-    Purple  = { accent = color3_new(0.70, 0.35, 1.00), hover = color3_new(0.78, 0.46, 1.00), active = color3_new(0.60, 0.28, 0.92) },
-    Green   = { accent = color3_new(0.20, 0.85, 0.45), hover = color3_new(0.30, 0.92, 0.55), active = color3_new(0.15, 0.72, 0.36) },
-    Red     = { accent = color3_new(1.00, 0.25, 0.25), hover = color3_new(1.00, 0.35, 0.35), active = color3_new(0.90, 0.15, 0.15) },
+    Classic = { accent = color3_fromRGB(180, 180, 185), hover = color3_fromRGB(65, 65, 65), active = color3_fromRGB(80, 80, 80) },
+    Grey    = { accent = color3_fromRGB(200, 200, 200), hover = color3_fromRGB(70, 70, 70), active = color3_fromRGB(85, 85, 85) },
 };
 
 local current_theme = "Classic";
@@ -104,16 +100,23 @@ function library.get_ui_keybind()
     return internal.ui_keybind;
 end;
 
--- Palette
-local bg = color3_new(0.12, 0.12, 0.14);
-local bg_secondary = color3_new(0.18, 0.18, 0.22);
-local bg_child = color3_new(0.15, 0.15, 0.18);
-local border_color = color3_new(0.26, 0.26, 0.30);
-local text_color = color3_new(0.90, 0.90, 0.92);
-local text_muted = color3_new(0.55, 0.55, 0.60);
+-- Exact 33,33,33 Dark Grey Palette & Pure White Text
+local bg = color3_fromRGB(33, 33, 33);
+local bg_secondary = color3_fromRGB(44, 44, 44);
+local bg_child = color3_fromRGB(26, 26, 26);
+local border_color = color3_fromRGB(52, 52, 52);
+local text_color = color3_fromRGB(255, 255, 255);
+local text_muted = color3_fromRGB(160, 160, 165);
 
 local function push_theme()
     local t = presets[current_theme];
+    
+    -- Sharp corners (0 rounding)
+    ImGui.PushStyleVar(ImGuiStyleVar_WindowRounding or 0, 0);
+    ImGui.PushStyleVar(ImGuiStyleVar_ChildRounding or 1, 0);
+    ImGui.PushStyleVar(ImGuiStyleVar_FrameRounding or 2, 0);
+    ImGui.PushStyleVar(ImGuiStyleVar_PopupRounding or 3, 0);
+    ImGui.PushStyleVar(ImGuiStyleVar_GrabRounding or 4, 0);
     
     ImGui.PushStyleColor(ImGuiCol_WindowBg, bg);
     ImGui.PushStyleColor(ImGuiCol_ChildBg, bg_child);
@@ -131,16 +134,17 @@ local function push_theme()
     ImGui.PushStyleColor(ImGuiCol_HeaderActive, t.accent);
     ImGui.PushStyleColor(ImGuiCol_SliderGrab, t.accent);
     ImGui.PushStyleColor(ImGuiCol_SliderGrabActive, t.hover);
-    ImGui.PushStyleColor(ImGuiCol_CheckMark, t.accent);
+    ImGui.PushStyleColor(ImGuiCol_CheckMark, text_color);
     ImGui.PushStyleColor(ImGuiCol_Separator, border_color);
 end;
 
 local function pop_theme()
     ImGui.PopStyleColor(18);
+    ImGui.PopStyleVar(5);
 end;
 
 local function push_accent_text()
-    ImGui.PushStyleColor(ImGuiCol_Text, presets[current_theme].accent);
+    ImGui.PushStyleColor(ImGuiCol_Text, text_color);
 end;
 
 local function pop_accent_text()
@@ -175,7 +179,7 @@ do
     function library.on_render()
         if isoverlayactive and not isoverlayactive() then return end;
         
-        -- Main Open/Close Keybind Check (VK Code)
+        -- Open/Close UI Toggle Key Check
         local main_code = VK[internal.ui_keybind.Key];
         if main_code and IsDown(main_code) then
             internal.ui_keybind.Down = true;
@@ -218,7 +222,7 @@ do
         pop_accent_text();
         
         ImGui.SameLine();
-        ImGui.TextColored(ImGui.GetColorU32(0.55, 0.55, 0.60, 1), library.version or "v1.0");
+        ImGui.TextColored(ImGui.GetColorU32(0.65, 0.65, 0.65, 1), library.version or "v1.0");
         
         local close_btn_size = 26;
         ImGui.SetCursorPos(vector2_new(window_size.X - close_btn_size - 10, 4));
@@ -230,7 +234,7 @@ do
         ImGui.Separator();
         
         -- ------------------------------------------------------
-        -- 2. LEFT SIDEBAR
+        -- 2. LEFT SIDEBAR (No > symbol)
         -- ------------------------------------------------------
         ImGui.BeginChild("Sidebar##" .. noise, vector2_new(sidebar_width, content_height), CHILD_BORDER);
         
@@ -241,11 +245,11 @@ do
         
         for i, tab in ipairs(internal.tab_list) do
             local is_active = internal.tab == i;
-            local tab_label = (is_active and "> " or "  ") .. tab.name;
+            local tab_label = tab.name;
             
             if is_active then
                 ImGui.PushStyleColor(ImGuiCol_Button, bg_secondary);
-                ImGui.PushStyleColor(ImGuiCol_Text, presets[current_theme].accent);
+                ImGui.PushStyleColor(ImGuiCol_Text, text_color);
             end;
             
             if ImGui.Button(tab_label .. "##sidebar_" .. noise .. i, vector2_new(sidebar_width - 16, 26)) then
@@ -398,7 +402,7 @@ do
         return new_val
     end;
     
-    -- EXACT KEYBIND IMPLEMENTATION
+    -- Standalone-style Keybind Picker Logic
     function library.keybind(name, ref)
         local label = library.split_name(name);
         if #label > 0 then
@@ -494,7 +498,7 @@ do
             ImGui.SameLine();
         end;
         
-        ref.color = ref.color or color3_new(1, 1, 1);
+        ref.color = ref.color or color3_fromRGB(255, 255, 255);
         
         if ImGui.ColorButton("##btn_" .. library.format_name(name), ref.color, ImGuiColorEditFlags_NoTooltip, vector2_new(30, 20)) then
             ref.visible = not ref.visible;
